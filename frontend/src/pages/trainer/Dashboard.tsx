@@ -3,20 +3,14 @@ import { api } from "@/lib/api";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import StatCard from "@/components/shared/StatCard";
 import {
-  CalendarDays,
-  Plus,
-  Link2,
-  Users,
-  ClipboardList,
-  Loader2,
-  Copy,
-  Check,
+  CalendarDays, Plus, Link2, Users, ClipboardList,
+  Loader2, Copy, Check, X, Info,
 } from "lucide-react";
 
 interface Batch {
   id: string;
   name: string;
-  institution: { name: string };
+  institution: { id: string; name: string };
   inviteCode?: string;
   _count: { students: number; sessions: number };
 }
@@ -43,7 +37,7 @@ interface SessionAttendance {
 }
 
 interface Props {
-  user: { id: string; name: string; role: string };
+  user: { id: string; name: string; role: string; institutionId?: string };
 }
 
 export default function TrainerDashboard({ user }: Props) {
@@ -54,17 +48,15 @@ export default function TrainerDashboard({ user }: Props) {
   const [loading, setLoading] = useState(true);
   const [inviteLinks, setInviteLinks] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<string | null>(null);
+
+  // Create Session modal
   const [showCreateSession, setShowCreateSession] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({
-    batchId: "",
-    title: "",
-    date: "",
-    startTime: "",
-    endTime: "",
-  });
-  const [error, setError] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [form, setForm] = useState({ batchId: "", title: "", date: "", startTime: "", endTime: "" });
 
+  // Create Batch modal
+  const [showCreateBatch, setShowCreateBatch] = useState(false);
   useEffect(() => {
     fetchData();
   }, []);
@@ -90,7 +82,7 @@ export default function TrainerDashboard({ user }: Props) {
       const res = await api.post(`/batches/${batchId}/invite`);
       setInviteLinks((prev) => ({ ...prev, [batchId]: res.data.inviteLink }));
     } catch (err: any) {
-      setError(err?.response?.data?.error || "Failed to generate invite");
+      setSessionError(err?.response?.data?.error || "Failed to generate invite");
     }
   };
 
@@ -111,9 +103,9 @@ export default function TrainerDashboard({ user }: Props) {
   };
 
   const createSession = async () => {
-    setError(null);
+    setSessionError(null);
     if (!form.batchId || !form.title || !form.date || !form.startTime || !form.endTime) {
-      setError("All fields are required");
+      setSessionError("All fields are required");
       return;
     }
     setCreating(true);
@@ -123,9 +115,31 @@ export default function TrainerDashboard({ user }: Props) {
       setForm({ batchId: "", title: "", date: "", startTime: "", endTime: "" });
       fetchData();
     } catch (err: any) {
-      setError(err?.response?.data?.error || "Failed to create session");
+      setSessionError(err?.response?.data?.error || "Failed to create session");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const createBatch = async () => {
+    if (!batchName.trim()) return;
+    setBatchError(null);
+    setCreatingBatch(true);
+    try {
+      // Trainer creates a batch under their institution
+      // If not linked to an institution yet, institutionId will be undefined
+      // and the backend will return a helpful error
+      await api.post("/batches", {
+        name: batchName.trim(),
+        institutionId: user.institutionId,
+      });
+      setShowCreateBatch(false);
+      setBatchName("");
+      fetchData();
+    } catch (err: any) {
+      setBatchError(err?.response?.data?.error || "Failed to create batch");
+    } finally {
+      setCreatingBatch(false);
     }
   };
 
@@ -152,21 +166,34 @@ export default function TrainerDashboard({ user }: Props) {
       navItems={navItems}
       activeView={view}
     >
+      {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {view === "sessions" ? "Sessions" : view === "batches" ? "My Batches" : "Attendance"}
+            {view === "sessions" ? "Sessions" : view === "batches" ? "My Batches" : "Attendance Detail"}
           </h1>
           <p className="text-gray-500 mt-1">Welcome, {user.name}</p>
         </div>
-        {view === "sessions" && (
-          <button
-            onClick={() => setShowCreateSession(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
-          >
-            <Plus className="h-4 w-4" /> Create Session
-          </button>
-        )}
+        <div className="flex gap-2">
+          {view === "batches" && (
+            <button
+              onClick={() => { setBatchError(null); setShowCreateBatch(true); }}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
+            >
+              <Plus className="h-4 w-4" /> Create Batch
+            </button>
+          )}
+          {view === "sessions" && (
+            <button
+              onClick={() => { setSessionError(null); setShowCreateSession(true); }}
+              disabled={batches.length === 0}
+              title={batches.length === 0 ? "Create or get assigned to a batch first" : ""}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus className="h-4 w-4" /> Create Session
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Stats */}
@@ -176,24 +203,74 @@ export default function TrainerDashboard({ user }: Props) {
         <StatCard title="Students" value={batches.reduce((sum, b) => sum + (b._count?.students || 0), 0)} icon={<ClipboardList className="h-6 w-6" />} color="text-purple-600 bg-purple-50" />
       </div>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-          {error}
+      {/* No-batch guidance banner */}
+      {batches.length === 0 && !loading && (
+        <div className="mb-6 flex items-start gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
+          <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <div>
+            <strong>No batches yet.</strong> You need a batch before you can create sessions or invite students.
+            You can either:
+            <ul className="mt-1 ml-4 list-disc space-y-0.5">
+              <li>
+                <button onClick={() => { setView("batches"); setBatchError(null); setShowCreateBatch(true); }} className="underline hover:text-blue-600">
+                  Create a batch yourself
+                </button>{" "}
+                (if your institution admin has linked you to an institution), or
+              </li>
+              <li>Ask your Institution Admin to create a batch and assign you to it.</li>
+            </ul>
+          </div>
         </div>
       )}
 
-      {/* Create Session Modal */}
+      {/* ── Create Batch Modal ── */}
+      {showCreateBatch && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 w-full max-w-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Create New Batch</h2>
+              <button onClick={() => setShowCreateBatch(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            </div>
+            {!user.institutionId && (
+              <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
+                ⚠️ You are not linked to an institution yet. Ask your Institution Admin or Programme Manager to assign you first.
+              </div>
+            )}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Batch Name</label>
+            <input
+              type="text" value={batchName}
+              onChange={(e) => setBatchName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && createBatch()}
+              placeholder="e.g. Web Dev – Batch A" autoFocus
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            {batchError && <p className="text-sm text-red-600 mb-3">{batchError}</p>}
+            <div className="flex gap-3">
+              <button onClick={() => setShowCreateBatch(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+              <button onClick={createBatch} disabled={creatingBatch || !batchName.trim()}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                {creatingBatch && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Create Session Modal ── */}
       {showCreateSession && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">Create Session</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Create Session</h2>
+              <button onClick={() => setShowCreateSession(false)} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+            </div>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Batch</label>
                 <select
                   value={form.batchId}
                   onChange={(e) => setForm({ ...form, batchId: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   <option value="">Select a batch</option>
                   {batches.map((b) => (
@@ -203,59 +280,47 @@ export default function TrainerDashboard({ user }: Props) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                <input
-                  type="text"
-                  value={form.title}
+                <input type="text" value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                   placeholder="e.g. Introduction to React"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <input
-                  type="date"
-                  value={form.date}
+                <input type="date" value={form.date}
                   onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
-                  <input
-                    type="time"
-                    value={form.startTime}
+                  <input type="time" value={form.startTime}
                     onChange={(e) => setForm({ ...form, startTime: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
-                  <input
-                    type="time"
-                    value={form.endTime}
+                  <input type="time" value={form.endTime}
                     onChange={(e) => setForm({ ...form, endTime: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
               </div>
             </div>
-            {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
+            {sessionError && <div className="mt-3 text-sm text-red-600">{sessionError}</div>}
             <div className="flex gap-3 mt-5">
               <button
-                onClick={() => { setShowCreateSession(false); setError(null); }}
+                onClick={() => { setShowCreateSession(false); setSessionError(null); }}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
               >
                 Cancel
               </button>
-              <button
-                onClick={createSession}
-                disabled={creating}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Create
+              <button onClick={createSession} disabled={creating}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                {creating && <Loader2 className="h-4 w-4 animate-spin" />} Create
               </button>
             </div>
           </div>
@@ -314,7 +379,13 @@ export default function TrainerDashboard({ user }: Props) {
           ) : batches.length === 0 ? (
             <div className="py-12 text-center text-gray-400">
               <Users className="h-10 w-10 mx-auto mb-3 opacity-30" />
-              <p>No batches assigned. Contact your institution admin.</p>
+              <p className="mb-2">No batches assigned yet.</p>
+              <button
+                onClick={() => { setBatchError(null); setShowCreateBatch(true); }}
+                className="text-sm text-green-600 hover:underline"
+              >
+                Create a batch →
+              </button>
             </div>
           ) : (
             <div className="divide-y divide-gray-100">

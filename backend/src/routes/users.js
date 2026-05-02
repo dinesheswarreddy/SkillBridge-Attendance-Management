@@ -1,8 +1,7 @@
 const express = require("express");
 const { Webhook } = require("svix");
 const prisma = require("../lib/prisma");
-const { requireAuth, requireAuthOrNew } = require("../middleware/auth");
-
+const { requireAuth, requireAuthOrNew, requireRole } = require("../middleware/auth");
 const router = express.Router();
 
 // Clerk Webhook - syncs user creation/updates to our DB
@@ -101,6 +100,22 @@ router.post("/users/sync", requireAuthOrNew, async (req, res) => {
   } catch (error) {
     console.error("Sync error:", error);
     res.status(500).json({ error: "Failed to sync user" });
+  }
+});
+
+// GET /api/users - List users, optionally filtered by role (PM only)
+router.get("/users", requireAuth, requireRole("PROGRAMME_MANAGER", "INSTITUTION"), async (req, res) => {
+  try {
+    const { role } = req.query;
+    const where = role ? { role } : {};
+    const users = await prisma.user.findMany({
+      where,
+      select: { id: true, name: true, email: true, role: true, institutionId: true },
+      orderBy: { name: "asc" },
+    });
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch users" });
   }
 });
 

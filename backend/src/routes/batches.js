@@ -277,4 +277,43 @@ router.get(
   }
 );
 
+// POST /api/batches/:id/assign-trainer - Institution assigns a trainer to a batch
+router.post(
+  "/batches/:id/assign-trainer",
+  requireAuth,
+  requireRole("INSTITUTION", "PROGRAMME_MANAGER"),
+  async (req, res) => {
+    try {
+      const { trainerId } = req.body;
+      if (!trainerId) return res.status(400).json({ error: "trainerId is required" });
+
+      const batch = await prisma.batch.findUnique({ where: { id: req.params.id } });
+      if (!batch) return res.status(404).json({ error: "Batch not found" });
+
+      // Institution can only assign to their own batches
+      if (req.user.role === "INSTITUTION" && batch.institutionId !== req.user.institutionId) {
+        return res.status(403).json({ error: "Access denied to this batch" });
+      }
+
+      // Upsert to avoid duplicate
+      await prisma.batchTrainer.upsert({
+        where: { batchId_trainerId: { batchId: req.params.id, trainerId } },
+        create: { batchId: req.params.id, trainerId },
+        update: {},
+      });
+
+      // Also ensure trainer's institutionId matches
+      await prisma.user.update({
+        where: { id: trainerId },
+        data: { institutionId: batch.institutionId },
+      });
+
+      res.status(201).json({ message: "Trainer assigned successfully" });
+    } catch (error) {
+      console.error("Assign trainer error:", error);
+      res.status(500).json({ error: "Failed to assign trainer" });
+    }
+  }
+);
+
 module.exports = router;
