@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.env.example
+package-lock.json
+package.json
+postcss.config.js
+tailwind.config.js
+tsconfig.json
+tsconfig.node.json
+vercel.json
+vite.config.ts

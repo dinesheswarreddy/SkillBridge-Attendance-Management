@@ -1,0 +1,9 @@
+node_modules/
+.env
+dist/
+*.log
+.env.example
+prisma/
+package-lock.json
+package.json
+railway.json
