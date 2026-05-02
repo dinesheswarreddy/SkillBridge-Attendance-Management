@@ -3,7 +3,4 @@ node_modules/
 dist/
 *.log
 .env.example
-prisma/
-package-lock.json
-package.json
-railway.json
+

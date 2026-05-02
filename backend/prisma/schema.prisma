@@ -1,0 +1,131 @@
+// This is your Prisma schema file
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  TRAINER
+  INSTITUTION
+  PROGRAMME_MANAGER
+  MONITORING_OFFICER
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+model User {
+  id            String   @id @default(cuid())
+  clerkUserId   String   @unique @map("clerk_user_id")
+  name          String
+  email         String   @unique
+  role          Role
+  institutionId String?  @map("institution_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  institution   Institution? @relation("InstitutionAdmin", fields: [institutionId], references: [id])
+
+  // As trainer
+  trainerBatches  BatchTrainer[]
+  trainerSessions Session[]
+
+  // As student
+  studentBatches BatchStudent[]
+  attendance     Attendance[]
+
+  @@map("users")
+}
+
+model Institution {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  admins  User[]    @relation("InstitutionAdmin")
+  batches Batch[]
+
+  @@map("institutions")
+}
+
+model Batch {
+  id            String   @id @default(cuid())
+  name          String
+  institutionId String   @map("institution_id")
+  inviteCode    String?  @unique @map("invite_code")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  institution Institution    @relation(fields: [institutionId], references: [id])
+  trainers    BatchTrainer[]
+  students    BatchStudent[]
+  sessions    Session[]
+
+  @@map("batches")
+}
+
+model BatchTrainer {
+  batchId   String @map("batch_id")
+  trainerId String @map("trainer_id")
+
+  batch   Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  trainer User  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@id([batchId, trainerId])
+  @@map("batch_trainers")
+}
+
+model BatchStudent {
+  batchId   String @map("batch_id")
+  studentId String @map("student_id")
+
+  batch   Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  student User  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([batchId, studentId])
+  @@map("batch_students")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  batchId   String   @map("batch_id")
+  trainerId String   @map("trainer_id")
+  title     String
+  date      DateTime @db.Date
+  startTime String   @map("start_time")
+  endTime   String   @map("end_time")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  batch      Batch        @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  trainer    User         @relation(fields: [trainerId], references: [id])
+  attendance Attendance[]
+
+  @@map("sessions")
+}
+
+model Attendance {
+  id        String           @id @default(cuid())
+  sessionId String           @map("session_id")
+  studentId String           @map("student_id")
+  status    AttendanceStatus
+  markedAt  DateTime         @default(now()) @map("marked_at")
+
+  // Relations
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  student User    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, studentId])
+  @@map("attendance")
+}
