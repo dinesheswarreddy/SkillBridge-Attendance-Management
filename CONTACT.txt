@@ -1,0 +1,5 @@
+Full Name: Dwarampudi Dinesh Eswar Reddy
+Email: dinesheswarreddy655@gmail.com
+Phone: +91 8332904909
+GitHub: https://github.com/dinesheswarreddy
+Most challenging part: Designing the role-based auth flow so that Clerk JWTs are verified server-side on every request while still gracefully handling the first-login "user not in DB yet" state without breaking the sign-up experience.
