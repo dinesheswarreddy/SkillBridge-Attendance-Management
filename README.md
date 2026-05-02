@@ -8,10 +8,10 @@ A deployed, end-to-end attendance management system for the fictional SkillBridg
 
 | Service    | URL                                           |
 |------------|-----------------------------------------------|
-| Frontend   | `https://skillbridge.vercel.app` *(update)*   |
-| Backend    | `https://skillbridge-api.railway.app` *(update)* |
-| API Base   | `https://skillbridge-api.railway.app/api`     |
-| Health     | `https://skillbridge-api.railway.app/health`  |
+| Frontend   | `https://skill-bridge-attendance-management.vercel.app/sign-in` *(updated)*   |
+| Backend    | `https://skillbridge-attendance-management.onrender.com` *(updated)* |
+| API Base   | `https://skillbridge-attendance-management.onrender.com/api`     |
+| Health     | `https://skillbridge-attendance-management.onrender.com/health`  |
 
 ---
 
@@ -21,11 +21,11 @@ All accounts use the same password for ease of testing: `SkillBridge@2024`
 
 | Role                | Email                              | Password            |
 |---------------------|------------------------------------|---------------------|
-| Student             | student@skillbridge.test           | SkillBridge@2024    |
-| Trainer             | trainer@skillbridge.test           | SkillBridge@2024    |
-| Institution Admin   | institution@skillbridge.test       | SkillBridge@2024    |
-| Programme Manager   | manager@skillbridge.test           | SkillBridge@2024    |
-| Monitoring Officer  | officer@skillbridge.test           | SkillBridge@2024    |
+| Student             | student_skillbridge@gmail.com      | SkillBridge@2026    |
+| Trainer             | trainer_skillbridge@gmail.com      | SkillBridge@2026    |
+| Institution Admin   | institution_skillbridge@gmail.com  | SkillBridge@2026    |
+| Programme Manager   | manager_skillbridge@gmail.com      | SkillBridge@2026    |
+| Monitoring Officer  | officer_skillbridge@gmail.com      | SkillBridge@2026    |
 
 > Create these accounts in Clerk dashboard after deploying, then sign in via the app and select the appropriate role.
 
